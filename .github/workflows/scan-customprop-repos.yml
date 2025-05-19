@@ -33,6 +33,6 @@ jobs:
           git config user.name github-actions
           git config user.email github-actions@github.com
           git add repos_report_with_custom_properties.xlsx
-          git commit -m "Auto-uploaded repo report" || echo "No changes to commit"
+          git commit -m "Auto-uploaded repo report with custom properties"
           git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
           git push origin HEAD:main
