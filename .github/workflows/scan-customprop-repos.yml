@@ -1,0 +1,38 @@
+name: GitHub Org Repo Scanner
+
+on:
+  workflow_dispatch:
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+
+      - name: Install dependencies
+        run: |
+          pip install requests pandas openpyxl
+
+      - name: Run repo scan script
+        env:
+          GITHUB_TOKEN: ${{ secrets.MY_GITHUB_PAT }}
+          GITHUB_ORG: ${{ secrets.MY_GITHUB_ORG }}
+        run: python scan_org_repos.py
+
+      - name: Commit and push Excel report
+        env:
+          TOKEN: ${{ secrets.MY_GITHUB_PAT }}
+        run: |
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add repos_report_with_custom_properties.xlsx
+          git commit -m "Auto-uploaded repo report" || echo "No changes to commit"
+          git remote set-url origin https://x-access-token:${TOKEN}@github.com/${{ github.repository }}
+          git push origin HEAD:main
