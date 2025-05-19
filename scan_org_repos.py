@@ -11,7 +11,8 @@ HEADERS = {
 }
 
 REPOS_API_URL = f"https://api.github.com/orgs/{ORG_NAME}/repos"
-CUSTOM_PROP_API_URL = f"https://api.github.com/orgs/{ORG_NAME}/properties/values/repositories"
+ALL_PROPERTIES_URL = f"https://api.github.com/orgs/{ORG_NAME}/properties/schema"
+PROP_VALUES_URL = f"https://api.github.com/orgs/{ORG_NAME}/custom-property-values"
 
 def get_repos():
     repos = []
@@ -26,7 +27,6 @@ def get_repos():
             break
         for repo in data:
             repos.append({
-                "ID": repo["id"],
                 "Name": repo["name"],
                 "Visibility": "Private" if repo["private"] else "Public",
                 "Fork": repo["fork"],
@@ -36,21 +36,31 @@ def get_repos():
         page += 1
     return repos
 
-def get_all_custom_property_values():
+def get_all_custom_properties():
+    response = requests.get(ALL_PROPERTIES_URL, headers=HEADERS)
+    if response.status_code != 200:
+        print("Error fetching custom properties:", response.status_code, response.text)
+        return []
+    return response.json()
+
+def get_all_property_values():
     values = {}
     page = 1
     while True:
-        response = requests.get(CUSTOM_PROP_API_URL, headers=HEADERS, params={"per_page": 100, "page": page})
+        response = requests.get(PROP_VALUES_URL, headers=HEADERS, params={"per_page": 100, "page": page})
         if response.status_code != 200:
-            print("Error fetching custom properties:", response.status_code, response.text)
+            print("Error fetching custom property values:", response.status_code, response.text)
             break
         data = response.json()
         if not data:
             break
         for item in data:
-            repo_id = item["repository_id"]
-            props = {p["property_name"]: p["value"] for p in item.get("properties", [])}
-            values[repo_id] = props
+            repo_name = item["repository"]["name"]
+            prop_name = item["property"]["name"]
+            value = item.get("value")
+            if repo_name not in values:
+                values[repo_name] = {}
+            values[repo_name][prop_name] = value
         page += 1
     return values
 
@@ -64,16 +74,13 @@ if __name__ == "__main__":
         print("No repositories found or error occurred.")
         exit(1)
 
-    custom_prop_map = get_all_custom_property_values()
+    all_property_values = get_all_property_values()
 
     for repo in repos:
-        repo_id = repo["ID"]
-        custom_props = custom_prop_map.get(repo_id, {})
-        repo.update(custom_props)
-
-    # Remove internal ID before saving
-    for repo in repos:
-        repo.pop("ID", None)
+        repo_name = repo["Name"]
+        custom_props = all_property_values.get(repo_name, {})
+        for key, value in custom_props.items():
+            repo[f"Custom: {key}"] = value
 
     save_to_excel(repos)
     print("✅ Report saved as repos_report_with_custom_properties.xlsx")
